@@ -8,11 +8,11 @@ y_ = tf.placeholder(tf.float32,shape=[None,10])
 
 W = tf.Variable(tf.zeros([784,10]),name="weights")
 b = tf.Variable(tf.zeros([10]),name="biases")
+y = tf.matmul(x,W) + b
 
 session = tf.InteractiveSession()
+train_writer = tf.summary.FileWriter("/tmp/mnist_logs/train",session.graph)
 session.run(tf.global_variables_initializer())
-
-y = tf.matmul(x,W) + b
 
 xent = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_,logits=y))
 train_step = tf.train.GradientDescentOptimizer(0.5).minimize(xent)
@@ -24,3 +24,5 @@ for _ in range(1000):
 correct_prediction = tf.equal(tf.argmax(y,1),tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
 print(accuracy.eval(feed_dict={x:mnist.test.images,y_:mnist.test.labels}))
+
+
