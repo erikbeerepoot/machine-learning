@@ -3,12 +3,12 @@
 Install dependencies:
 ```
 # Create virtualenv 
-mkvirtualenv machine_learning
+python -m venv machine_learning
 
 # or if you already have one
-workon machine_learning
+source machine_learning/bin/activate
 
 # Install deps
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
