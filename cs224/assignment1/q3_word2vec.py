@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import numpy as np
 import random
+
+import numpy as np
 
 from q1_softmax import softmax
 from q2_gradcheck import gradcheck_naive
-from q2_sigmoid import sigmoid, sigmoid_grad
+from q2_sigmoid import sigmoid
 
 
 def normalizeRows(x):
@@ -198,12 +199,19 @@ def cbow(currentWord, C, contextWords, tokens, inputVectors, outputVectors,
     gradIn = np.zeros(inputVectors.shape)
     gradOut = np.zeros(outputVectors.shape)
 
-    # ### YOUR CODE HERE
-    # raise NotImplementedError
-    # ### END YOUR CODE
+    vectors = [tokens[word] for word in contextWords]
+    predicted = np.sum(inputVectors[vectors], axis=0)
+
+    target = tokens[currentWord]
+
+    cost, gradPred, gradOut = word2vecCostAndGradient(predicted, target, outputVectors, dataset)
+
+    # gradIn = np.tile(gradPred.reshape((1, 3)), (inputVectors.shape[0], 1))
+
+    for t in vectors:
+        gradIn[t] += gradPred.reshape(-1)
 
     return cost, gradIn, gradOut
-
 
 #############################################
 # Testing functions below. DO NOT MODIFY!   #
