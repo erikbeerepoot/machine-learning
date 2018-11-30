@@ -1,0 +1,84 @@
+---
+- hosts: all
+  vars:
+        jupyter_json_config: ~/.jupyter/jupyter_notebook_config.json
+        jupyter_py_config: ~/.jupyter/jupyter_notebook_config.py
+        copy_dir: ~/Dropbox/Code/machine-learning/
+  tasks:
+        - name: Create cert directory 
+          file: 
+                path: ~/ssl/
+                state: directory
+
+        - name: Create ssl cert for Jupyter
+          command: openssl req -x509 -nodes -days 365 -newkey rsa:1024 -keyout "ssl/cert.key" -out "ssl/cert.pem" -batch
+
+        - name: Generate Jupyter configuration file
+          expect: 
+                command: jupyter notebook --generate-config
+                responses:
+                        (?i)default config?: "y"
+          
+        - name: Set Jupyter password
+          expect: 
+                command: jupyter notebook password
+                responses:
+                      (?i)password: "MySekretPa$$word"
+          
+        - name: Slurp Jupyter password file
+          slurp: 
+                src: "{{ jupyter_json_config }}"
+          register: jupyter_json_config
+
+        - debug:
+                msg: "{{jupyter_json_config['content'] | b64decode }}"
+          
+        - name: Set hashed password
+          set_fact:
+                password_hash: "{{ (jupyter_json_config['content'] | b64decode | from_json)['NotebookApp']['password'] }}"
+
+        - name: Configure Jupyter to use keys, prevent window opening, and set bind address
+          blockinfile:
+                path: "{{ jupyter_py_config }}" 
+                block: |
+                      c = get_config()  # Get the config object.
+                      c.NotebookApp.certfile = u'/home/ubuntu/ssl/cert.pem' # path to the certificate we generated
+                      c.NotebookApp.keyfile = u'/home/ubuntu/ssl/cert.key' # path to the certificate key we generated
+                      c.NotebookApp.ip = '*'  # Serve notebooks locally.
+                      c.NotebookApp.open_browser = False  # Do not open a browser window by default when using notebooks.
+
+        - name: Put pashword hash in Jupyter config file 
+          lineinfile:
+                path: "{{ jupyter_py_config }}"
+                regexp: '^c\.NotebookApp\.password'
+                line: 'c.NotebookApp.password = "{{password_hash}}"'
+
+        - name: Get running processes
+          shell: "ps -ef | grep -v grep | grep -w jupyter | awk '{print $2}'"
+          register: running_processes
+
+        - name: Kill running processes
+          shell: "kill {{ item }}"
+          with_items: "{{ running_processes.stdout_lines }}"
+
+        - wait_for:
+                path: "/proc/{{ item }}/status"
+                state: absent
+          with_items: "{{ running_processes.stdout_lines }}"
+          ignore_errors: yes
+          register: killed_processes
+
+        - name: Force kill stuck processes
+          shell: "kill -9 {{ item }}"
+          with_items: "{{ killed_processes.results | select('failed') | map(attribute='item') | list }}"
+
+        - name: Start Jupyter notebook server
+          shell: jupyter notebook </dev/null >/dev/null 2>&1 &
+          async: 2592000
+          poll: 0 
+
+        - name: Copy files to remote
+          copy: 
+                src: "{{ copy_dir }}"
+                dest: ~/workspace/
+

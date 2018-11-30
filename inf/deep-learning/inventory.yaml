@@ -1,0 +1,5 @@
+[learning-boxes]
+ec2-34-219-62-211.us-west-2.compute.amazonaws.com 
+
+[learning-boxes:vars]
+ansible_user=ubuntu
