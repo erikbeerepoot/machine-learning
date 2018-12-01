@@ -3,8 +3,28 @@
   vars:
         jupyter_json_config: ~/.jupyter/jupyter_notebook_config.json
         jupyter_py_config: ~/.jupyter/jupyter_notebook_config.py
+        virtualenv: tensorflow_p36
         copy_dir: ~/Dropbox/Code/machine-learning/
   tasks:
+      - name: Get running processes
+          shell: "ps -ef | grep -v grep | grep -w jupyter | awk '{print $2}'"
+          register: running_processes
+
+        - name: Kill running processes
+          shell: "kill {{ item }}"
+          with_items: "{{ running_processes.stdout_lines }}"
+
+        - wait_for:
+                path: "/proc/{{ item }}/status"
+                state: absent
+          with_items: "{{ running_processes.stdout_lines }}"
+          ignore_errors: yes
+          register: killed_processes
+
+        - name: Force kill stuck processes
+          shell: "kill -9 {{ item }}"
+          with_items: "{{ killed_processes.results | select('failed') | map(attribute='item') | list }}"
+
         - name: Create cert directory 
           file: 
                 path: ~/ssl/
@@ -52,28 +72,23 @@
                 path: "{{ jupyter_py_config }}"
                 regexp: '^c\.NotebookApp\.password'
                 line: 'c.NotebookApp.password = "{{password_hash}}"'
+      
+        - name: Install jupyter plugins 
+          shell: pip3 install jupyter_contrib_nbextensions --user
 
-        - name: Get running processes
-          shell: "ps -ef | grep -v grep | grep -w jupyter | awk '{print $2}'"
-          register: running_processes
-
-        - name: Kill running processes
-          shell: "kill {{ item }}"
-          with_items: "{{ running_processes.stdout_lines }}"
-
-        - wait_for:
-                path: "/proc/{{ item }}/status"
-                state: absent
-          with_items: "{{ running_processes.stdout_lines }}"
-          ignore_errors: yes
-          register: killed_processes
-
-        - name: Force kill stuck processes
-          shell: "kill -9 {{ item }}"
-          with_items: "{{ killed_processes.results | select('failed') | map(attribute='item') | list }}"
+        - name: Install nbextensions javascript and css files
+          shell: |
+                  source activate {{ virtualenv }} 
+                  jupyter contrib nbextension install --user
+          args:
+                executable: /bin/bash
 
         - name: Start Jupyter notebook server
-          shell: jupyter notebook </dev/null >/dev/null 2>&1 &
+          shell: |
+                  source activate {{ virtualenv }} 
+                  jupyter notebook </dev/null >/dev/null 2>&1 &
+          args:
+                executable: /bin/bash
           async: 2592000
           poll: 0 
 

@@ -4,4 +4,3 @@ ansible_user=ubuntu
 [learning-boxes]
 
 
-ec2-34-220-73-252.us-west-2.compute.amazonaws.com
